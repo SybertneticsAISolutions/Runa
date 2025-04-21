@@ -1,5 +1,5 @@
 import pytest
-from runa.src.runa.lexer import RunaLexer
+from src.runa.lexer import RunaLexer
 
 
 def test_lexer_basic():

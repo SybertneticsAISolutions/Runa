@@ -2,7 +2,6 @@ import ply.yacc as yacc
 from lexer import RunaLexer
 from ast.nodes import *
 
-from runa.src.runa.ast.nodes import ListExpression
 
 
 class RunaParser:

@@ -1,6 +1,6 @@
 import os
 import pytest
-from runa.src.runa.transpiler import Transpiler
+from src.runa.transpiler import Transpiler
 
 
 def test_integration_calculator():

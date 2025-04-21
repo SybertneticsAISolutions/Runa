@@ -1,6 +1,6 @@
 import pytest
-from runa.src.runa.parser import RunaParser
-from runa.src.runa.ast.nodes import *
+from src.runa.parser import RunaParser
+from src.runa.ast.nodes import *
 
 
 def test_parser_variable_declaration():

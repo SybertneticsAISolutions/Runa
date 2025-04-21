@@ -1,7 +1,7 @@
 import pytest
-from runa.src.runa.parser import RunaParser
-from runa.src.runa.analyzer import SemanticAnalyzer
-from runa.src.runa.generator import PyCodeGenerator
+from src.runa.parser import RunaParser
+from src.runa.analyzer import SemanticAnalyzer
+from src.runa.generator import PyCodeGenerator
 
 
 def test_generator_variable_declaration():

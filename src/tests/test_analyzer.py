@@ -1,6 +1,6 @@
 import pytest
-from runa.src.runa.parser import RunaParser
-from runa.src.runa.analyzer import SemanticAnalyzer
+from src.runa.parser import RunaParser
+from src.runa.analyzer import SemanticAnalyzer
 
 
 def test_analyzer_variable_declaration():
