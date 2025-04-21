@@ -21,7 +21,7 @@ This is Phase 2 of the Runa language implementation, focusing on the parser and 
 
 ```bash
 # Clone the repository
-git clone https://github.com/sybertnetics/runa.git
+git clone https://github.com/SybertneticsAISolutions/Runa.git
 cd runa
 
 # Install the package in development mode
