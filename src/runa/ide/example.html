@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runa Editor - Monaco Integration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        header {
+            background-color: #4a76a8;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .title {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .editor-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+        .output-container {
+            width: 350px;
+            background-color: #f5f5f5;
+            border-left: 1px solid #ddd;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .output-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .output-tabs {
+            display: flex;
+            gap: 10px;
+        }
+        .output-tab {
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .output-tab.active {
+            background-color: #ddd;
+            font-weight: bold;
+        }
+        .output-content {
+            font-family: Menlo, Monaco, 'Courier New', monospace;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            flex: 1;
+        }
+        .problems-container {
+            display: none;
+            font-family: Menlo, Monaco, 'Courier New', monospace;
+            flex: 1;
+            overflow-y: auto;
+        }
+        .problem-item {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-left: 3px solid;
+            cursor: pointer;
+        }
+        .problem-item.error {
+            border-left-color: #d32f2f;
+            background-color: rgba(211, 47, 47, 0.1);
+        }
+        .problem-item.warning {
+            border-left-color: #f57c00;
+            background-color: rgba(245, 124, 0, 0.1);
+        }
+        .problem-item.info {
+            border-left-color: #0288d1;
+            background-color: rgba(2, 136, 209, 0.1);
+        }
+        .problem-message {
+            font-weight: bold;
+        }
+        .problem-location {
+            font-size: 0.9em;
+            color: #666;
+        }
+        button {
+            background-color: #5a86b8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #3a66a8;
+        }
+        select {
+            padding: 7px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .footer {
+            background-color: #f0f0f0;
+            padding: 10px 20px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        .lsp-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .lsp-status.connected {
+            background-color: #4caf50;
+        }
+        .lsp-status.disconnected {
+            background-color: #f44336;
+        }
+        .lsp-status.connecting {
+            background-color: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="title">Runa Editor</div>
+        <div class="controls">
+            <select id="example-select">
+                <option value="hello_world">Hello World</option>
+                <option value="functions">Functions</option>
+                <option value="control_flow">Control Flow</option>
+                <option value="data_structures">Data Structures</option>
+                <option value="advanced">Advanced Features</option>
+            </select>
+            <button id="load-example">Load Example</button>
+            <select id="target-language">
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+            </select>
+            <button id="compile-btn">Compile</button>
+            <button id="run-btn">Run</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="editor-container" id="editor-container"></div>
+        <div class="output-container">
+            <div class="output-header">
+                <div>Output</div>
+                <div class="output-tabs">
+                    <div class="output-tab active" data-tab="output">Console</div>
+                    <div class="output-tab" data-tab="problems">Problems</div>
+                </div>
+            </div>
+            <div class="output-content" id="output"></div>
+            <div class="problems-container" id="problems">
+                <!-- Problems will be added here dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="status">
+            <span class="lsp-status disconnected" id="lsp-status"></span>
+            <span id="status">Ready</span>
+        </div>
+        <div class="actions">
+            <button id="clear-output">Clear Output</button>
+            <button id="advanced-mode">Toggle Advanced Mode</button>
+            <button id="connect-lsp">Connect to LSP</button>
+        </div>
+    </div>
+
+    <!-- Monaco Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs/loader.js"></script>
+    <script>
+        // Configure paths for Monaco Editor
+        require.config({
+            paths: {
+                'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.0/min/vs'
+            }
+        });
+
+        // Load Monaco Editor
+        require(['vs/editor/editor.main'], function() {
+            // Import our Runa integration module
+            import('./monaco.js').then(runaMonaco => {
+                let editor;
+                let languageClient = null;
+                let lspConnected = false;
+                let advancedMode = false;
+                let problemMarkers = [];
+                
+                // Set up WebSocket for LSP
+                let socket = null;
+                
+                // Initialize editor
+                editor = runaMonaco.createRunaEditor(
+                    document.getElementById('editor-container'),
+                    getExampleCode('hello_world'),
+                    {}
+                );
+                
+                // Set up event handlers
+                document.getElementById('load-example').addEventListener('click', () => {
+                    const example = document.getElementById('example-select').value;
+                    editor.setValue(getExampleCode(example));
+                });
+
+                document.getElementById('compile-btn').addEventListener('click', () => {
+                    compileRunaCode();
+                });
+
+                document.getElementById('run-btn').addEventListener('click', () => {
+                    runCompiledCode();
+                });
+
+                document.getElementById('clear-output').addEventListener('click', () => {
+                    document.getElementById('output').textContent = '';
+                    document.getElementById('problems').innerHTML = '';
+                    clearEditorMarkers();
+                });
+
+                document.getElementById('advanced-mode').addEventListener('click', () => {
+                    toggleAdvancedMode();
+                });
+                
+                document.getElementById('connect-lsp').addEventListener('click', () => {
+                    connectToLSP();
+                });
+                
+                // Set up output tabs
+                document.querySelectorAll('.output-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        // Set this tab as active
+                        document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        
+                        // Show the corresponding content
+                        const tabName = tab.getAttribute('data-tab');
+                        document.getElementById('output').style.display = tabName === 'output' ? 'block' : 'none';
+                        document.getElementById('problems').style.display = tabName === 'problems' ? 'block' : 'none';
+                    });
+                });
+
+                updateStatus('Ready - Basic Mode');
+
+                // Connect to LSP server via WebSocket
+                function connectToLSP() {
+                    updateLSPStatus('connecting');
+                    updateStatus('Connecting to LSP server...');
+                    
+                    try {
+                        // Create WebSocket connection
+                        socket = new WebSocket('ws://localhost:8080/runa-lsp');
+                        
+                        socket.onopen = function() {
+                            updateLSPStatus('connected');
+                            updateStatus('Connected to LSP server');
+                            lspConnected = true;
+                            
+                            // Create language client
+                            try {
+                                languageClient = runaMonaco.createLanguageClient(
+                                    monaco, 
+                                    editor, 
+                                    window.location.pathname
+                                );
+                                
+                                // Set the transport
+                                languageClient.setTransport(socket);
+                                
+                                // Initialize the client
+                                languageClient.initialize({
+                                    advancedMode: advancedMode
+                                }).then(() => {
+                                    updateStatus('LSP client initialized');
+                                    
+                                    // Validate current document
+                                    validateDocument();
+                                });
+                            } catch (e) {
+                                console.error('Error creating language client:', e);
+                                updateStatus('Error: Failed to create language client');
+                            }
+                        };
+                        
+                        socket.onmessage = function(event) {
+                            // Process LSP message
+                            if (languageClient) {
+                                try {
+                                    languageClient.handleMessage(event.data);
+                                } catch (e) {
+                                    console.error('Error handling LSP message:', e);
+                                }
+                            }
+                        };
+                        
+                        socket.onerror = function(error) {
+                            console.error('WebSocket error:', error);
+                            updateLSPStatus('disconnected');
+                            updateStatus('Error: WebSocket connection failed');
+                        };
+                        
+                        socket.onclose = function() {
+                            updateLSPStatus('disconnected');
+                            updateStatus('Disconnected from LSP server');
+                            lspConnected = false;
+                        };
+                    } catch (e) {
+                        console.error('Error connecting to LSP server:', e);
+                        updateLSPStatus('disconnected');
+                        updateStatus('Error: Could not connect to LSP server');
+                    }
+                }
+                
+                // Validate the current document using LSP
+                function validateDocument() {
+                    if (lspConnected && languageClient) {
+                        const docText = editor.getValue();
+                        
+                        // Use didOpen to validate the document
+                        const params = {
+                            textDocument: {
+                                uri: 'untitled:current-document.runa',
+                                languageId: 'runa',
+                                version: 1,
+                                text: docText
+                            }
+                        };
+                        
+                        languageClient.didOpenTextDocument(params).then(() => {
+                            console.log('Document validated');
+                        });
+                    } else {
+                        // Fallback to simple validation if LSP is not connected
+                        validateDocumentLocal();
+                    }
+                }
+                
+                // Local validation fallback
+                function validateDocumentLocal() {
+                    const code = editor.getValue();
+                    const lines = code.split('\n');
+                    const problems = [];
+                    
+                    // Simple validation rules
+                    lines.forEach((line, index) => {
+                        // Check for missing colons after blocks
+                        if (line.trim().match(/^(If|For each|While|Process called).*[^:]$/)) {
+                            problems.push({
+                                severity: 'error',
+                                message: 'Missing colon at the end of the statement',
+                                line: index,
+                                column: line.length
+                            });
+                        }
+                        
+                        // Check for undeclared variables (very basic)
+                        if (line.trim().match(/^Display\s+([a-zA-Z_]\w*)/)) {
+                            const varName = line.trim().match(/^Display\s+([a-zA-Z_]\w*)/)[1];
+                            if (!code.includes(`Let ${varName} be`)) {
+                                problems.push({
+                                    severity: 'warning',
+                                    message: `Variable '${varName}' might not be declared`,
+                                    line: index,
+                                    column: line.indexOf(varName)
+                                });
+                            }
+                        }
+                    });
+                    
+                    // Update the problem list
+                    updateProblems(problems);
+                }
+                
+                // Update the problems panel
+                function updateProblems(problems) {
+                    const problemsContainer = document.getElementById('problems');
+                    problemsContainer.innerHTML = '';
+                    
+                    if (problems.length === 0) {
+                        problemsContainer.innerHTML = '<div style="color: #4caf50; padding: 10px;">No problems detected</div>';
+                        return;
+                    }
+                    
+                    // Clear existing markers
+                    clearEditorMarkers();
+                    
+                    // Add each problem to the panel
+                    problems.forEach(problem => {
+                        const problemItem = document.createElement('div');
+                        problemItem.className = `problem-item ${problem.severity}`;
+                        
+                        const message = document.createElement('div');
+                        message.className = 'problem-message';
+                        message.textContent = problem.message;
+                        
+                        const location = document.createElement('div');
+                        location.className = 'problem-location';
+                        location.textContent = `Line ${problem.line + 1}, Column ${problem.column + 1}`;
+                        
+                        problemItem.appendChild(message);
+                        problemItem.appendChild(location);
+                        
+                        // Add click handler to navigate to the problem
+                        problemItem.addEventListener('click', () => {
+                            editor.setPosition({ lineNumber: problem.line + 1, column: problem.column + 1 });
+                            editor.focus();
+                            editor.revealLineInCenter(problem.line + 1);
+                        });
+                        
+                        problemsContainer.appendChild(problemItem);
+                        
+                        // Add marker to the editor
+                        addEditorMarker(problem);
+                    });
+                }
+                
+                // Add a marker to the editor
+                function addEditorMarker(problem) {
+                    const marker = {
+                        startLineNumber: problem.line + 1,
+                        startColumn: problem.column + 1,
+                        endLineNumber: problem.line + 1,
+                        endColumn: problem.column + 30, // Approximate length of the issue
+                        message: problem.message,
+                        severity: problem.severity === 'error' ? 
+                            monaco.MarkerSeverity.Error : 
+                            (problem.severity === 'warning' ? 
+                                monaco.MarkerSeverity.Warning : 
+                                monaco.MarkerSeverity.Info)
+                    };
+                    
+                    problemMarkers.push(marker);
+                    monaco.editor.setModelMarkers(editor.getModel(), 'runa', problemMarkers);
+                }
+                
+                // Clear all markers from the editor
+                function clearEditorMarkers() {
+                    problemMarkers = [];
+                    monaco.editor.setModelMarkers(editor.getModel(), 'runa', []);
+                }
+                
+                // Update the LSP connection status indicator
+                function updateLSPStatus(status) {
+                    const indicator = document.getElementById('lsp-status');
+                    indicator.className = 'lsp-status ' + status;
+                }
+
+                // Compile the Runa code to the target language
+                function compileRunaCode() {
+                    const code = editor.getValue();
+                    const targetLanguage = document.getElementById('target-language').value;
+
+                    // Update status
+                    updateStatus(`Compiling to ${targetLanguage}...`);
+                    
+                    // Validate the document
+                    if (lspConnected) {
+                        validateDocument();
+                    } else {
+                        validateDocumentLocal();
+                    }
+
+                    // In a real implementation, this would call the Runa transpiler
+                    // For demo purposes, we'll simulate the compilation
+                    setTimeout(() => {
+                        let compiledCode;
+
+                        if (targetLanguage === 'python') {
+                            compiledCode = simulatePythonCompilation(code);
+                        } else {
+                            compiledCode = simulateJavaScriptCompilation(code);
+                        }
+
+                        // Display the compiled code
+                        document.getElementById('output').textContent = compiledCode;
+                        
+                        // Switch to output tab
+                        document.querySelector('.output-tab[data-tab="output"]').click();
+
+                        // Update status
+                        updateStatus(`Compiled to ${targetLanguage} successfully`);
+
+                        // Store the compiled code for running
+                        window.compiledCode = compiledCode;
+                        window.compiledLanguage = targetLanguage;
+                    }, 500);
+                }
+
+                // Run the compiled code
+                function runCompiledCode() {
+                    if (!window.compiledCode) {
+                        updateStatus('Please compile the code first');
+                        return;
+                    }
+
+                    updateStatus(`Running ${window.compiledLanguage} code...`);
+
+                    // In a real implementation, this would execute the compiled code
+                    // For demo purposes, we'll simulate the execution
+                    setTimeout(() => {
+                        const output = simulateCodeExecution(window.compiledCode, window.compiledLanguage);
+                        document.getElementById('output').textContent += '\n\n--- Execution Output ---\n' + output;
+                        updateStatus('Execution completed');
+                    }, 500);
+                }
+
+                // Toggle advanced mode
+                function toggleAdvancedMode() {
+                    advancedMode = !advancedMode;
+                    updateStatus(`Ready - ${advancedMode ? 'Advanced' : 'Basic'} Mode`);
+                    
+                    // Update language client if connected
+                    if (lspConnected && languageClient) {
+                        languageClient.updateConfiguration({
+                            advancedMode: advancedMode
+                        });
+                    }
+                }
+
+                // Update status display
+                function updateStatus(message) {
+                    document.getElementById('status').textContent = message;
+                }
+
+                // Simulate Python compilation (very simplified)
+                function simulatePythonCompilation(runaCode) {
+                    // This is a very simplified simulation of compilation
+                    // In a real implementation, this would use the Runa transpiler
+
+                    let pythonCode = '# Generated Python code from Runa\n\n';
+
+                    // Very basic transformation
+                    runaCode.split('\n').forEach(line => {
+                        if (line.trim().startsWith('#')) {
+                            // Comments
+                            pythonCode += line + '\n';
+                        } else if (line.trim().startsWith('Let ')) {
+                            // Variable declaration
+                            pythonCode += line.replace('Let ', '').replace(' be ', ' = ') + '\n';
+                        } else if (line.trim().startsWith('Display ')) {
+                            // Print statement
+                            pythonCode += line.replace('Display ', 'print(').replace(' with ', ', ') + ')\n';
+                        } else if (line.trim().startsWith('Process called ')) {
+                            // Function definition
+                            pythonCode += line
+                                .replace('Process called ', 'def ')
+                                .replace('"', '')
+                                .replace('"', '')
+                                .replace(' that takes ', '(')
+                                .replace(' and ', ', ')
+                                .replace(':', '):\n');
+                        } else if (line.trim().startsWith('Return ')) {
+                            // Return statement
+                            pythonCode += line.replace(' multiplied by ', ' * ').replace(' plus ', ' + ') + '\n';
+                        } else if (line.trim().startsWith('If ')) {
+                            // If statement
+                            pythonCode += line.replace(' is equal to ', ' == ').replace(' is greater than ', ' > ') + '\n';
+                        } else if (line.trim().startsWith('Otherwise:')) {
+                            // Else statement
+                            pythonCode += 'else:\n';
+                        } else if (line.trim().startsWith('For each ')) {
+                            // For loop
+                            pythonCode += line.replace('For each ', 'for ').replace(' in ', ' in ') + '\n';
+                        } else {
+                            // Other lines
+                            pythonCode += line + '\n';
+                        }
+                    });
+
+                    return pythonCode;
+                }
+
+                // Simulate JavaScript compilation (very simplified)
+                function simulateJavaScriptCompilation(runaCode) {
+                    // This is a very simplified simulation of compilation
+                    // In a real implementation, this would use the Runa transpiler
+
+                    let jsCode = '// Generated JavaScript code from Runa\n\n';
+
+                    // Very basic transformation
+                    runaCode.split('\n').forEach(line => {
+                        if (line.trim().startsWith('#')) {
+                            // Comments
+                            jsCode += line.replace('#', '//') + '\n';
+                        } else if (line.trim().startsWith('Let ')) {
+                            // Variable declaration
+                            jsCode += line.replace('Let ', 'let ').replace(' be ', ' = ') + '\n';
+                        } else if (line.trim().startsWith('Display ')) {
+                            // Print statement
+                            jsCode += line.replace('Display ', 'console.log(').replace(' with ', ', ') + ');\n';
+                        } else if (line.trim().startsWith('Process called ')) {
+                            // Function definition
+                            jsCode += line
+                                .replace('Process called ', 'function ')
+                                .replace('"', '')
+                                .replace('"', '')
+                                .replace(' that takes ', '(')
+                                .replace(' and ', ', ')
+                                .replace(':', ') {\n');
+                        } else if (line.trim().startsWith('Return ')) {
+                            // Return statement
+                            jsCode += line.replace(' multiplied by ', ' * ').replace(' plus ', ' + ') + ';\n';
+                        } else if (line.trim().startsWith('If ')) {
+                            // If statement
+                            jsCode += line.replace(' is equal to ', ' === ').replace(' is greater than ', ' > ') + ' {\n';
+                        } else if (line.trim().startsWith('Otherwise:')) {
+                            // Else statement
+                            jsCode += '} else {\n';
+                        } else if (line.trim().startsWith('For each ')) {
+                            // For loop
+                            jsCode += line.replace('For each ', 'for (const ').replace(' in ', ' of ') + ' {\n';
+                        } else if (line.trim() === "") {
+                            // Empty line
+                            jsCode += '\n';
+                        } else {
+                            // Other lines - add closing braces for blocks
+                            if (line.trim() === "" && jsCode.trim().endsWith('{')) {
+                                jsCode += '}\n';
+                            } else {
+                                jsCode += line + '\n';
+                            }
+                        }
+                    });
+
+                    return jsCode;
+                }
+
+                // Simulate code execution (just a demonstration)
+                function simulateCodeExecution(code, language) {
+                    return `[Simulated ${language} execution]\n` +
+                           `Code was executed successfully.\n` +
+                           `(In a real implementation, this would execute the code and show actual output)`;
+                }
+
+                // Get example code
+                function getExampleCode(example) {
+                    const examples = {
+                        hello_world: `# Hello World example in Runa
+
+Let message be "Hello, world!"
+Display message
+
+Let name be "Runa"
+Display "Hello," with message as name`,
+
+                        functions: `# Function example in Runa
+
+Process called "add" that takes a and b:
+    Return a plus b
+
+Process called "multiply" that takes a and b:
+    Return a multiplied by b
+
+Let sum be add with a as 5 and b as 10
+Let product be multiply with a as 5 and b as 10
+
+Display "Sum:" with result as sum
+Display "Product:" with result as product`,
+
+                        control_flow: `# Control flow example in Runa
+
+Let x be 10
+
+If x is greater than 5:
+    Display "x is greater than 5"
+Otherwise:
+    Display "x is not greater than 5"
+
+Let numbers be list containing 1, 2, 3, 4, 5
+
+For each num in numbers:
+    If num is greater than 2:
+        Display num`,
+
+                        data_structures: `# Data structures example in Runa
+
+Let numbers be list containing 1, 2, 3, 4, 5
+Let first_number be numbers at index 0
+
+Let person be dictionary with:
+    "name" as "Alice"
+    "age" as 30
+    "city" as "New York"
+
+Let name be person at index "name"
+
+Display "First number:" with result as first_number
+Display "Name:" with result as name`,
+
+                        advanced: `# Advanced features example in Runa
+# (requires advanced mode)
+
+# Type definitions
+Type UserId is Integer
+Type User is Dictionary[String, Any]
+
+# Lambda expression
+Let double be Lambda x: x multiplied by 2
+
+# Pattern matching
+Process called "describe_user" that takes user:
+    Match user:
+        When {"name": name, "role": "admin"}:
+            Return "Admin: " followed by name
+
+        When {"name": name}:
+            Return "User: " followed by name
+
+        When _:
+            Return "Unknown user"
+
+# Async function
+Async Process called "fetch_data" that takes url:
+    # Simulate network delay
+    await sleep with seconds as 1
+
+    # Return data
+    Return "Data from " followed by url
+
+# Function composition
+Let format_name be Lambda name: "User: " followed by name
+Let uppercase be Lambda text: text to uppercase
+Let format_and_uppercase be compose uppercase with format_name
+
+# Create test data
+Let admin be dictionary with:
+    "name" as "Alice"
+    "role" as "admin"
+
+Let user be dictionary with:
+    "name" as "Bob"
+    "role" as "user"
+
+# Test the functions
+Let admin_description be describe_user with user as admin
+Let user_description be describe_user with user as user
+Let formatted_name be format_and_uppercase with name as "charlie"
+
+Display "Admin:" with result as admin_description
+Display "User:" with result as user_description
+Display "Formatted:" with result as formatted_name`
+                    };
+
+                    return examples[example] || examples.hello_world;
+                }
+                
+                // Initialize editor with content
+                editor.setValue(getExampleCode('hello_world'));
+                
+                // Set up editor change event
+                editor.onDidChangeModelContent(() => {
+                    // Clear previous markers
+                    clearEditorMarkers();
+                    
+                    // Validate document after a short delay
+                    if (lspConnected) {
+                        // If LSP is connected, send didChange notification
+                        if (languageClient) {
+                            const params = {
+                                textDocument: {
+                                    uri: 'untitled:current-document.runa',
+                                    version: Date.now()
+                                },
+                                contentChanges: [
+                                    {
+                                        text: editor.getValue()
+                                    }
+                                ]
+                            };
+                            languageClient.didChangeTextDocument(params);
+                        }
+                    } else {
+                        // Otherwise use local validation after a short delay
+                        clearTimeout(window.validationTimeout);
+                        window.validationTimeout = setTimeout(() => {
+                            validateDocumentLocal();
+                        }, 500);
+                    }
+                });
+            }).catch(error => {
+                console.error('Error loading Runa Monaco integration:', error);
+                document.getElementById('status').textContent = 'Error: Failed to load editor';
+            });
+        });
+    </script>
+</body>
+</html>

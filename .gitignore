@@ -1,0 +1,16 @@
+# Documentation directories
+/docs/AIIntegration/
+/docs/KnowledgeGraphs/
+/docs/LLMIntegration/
+
+# Development environments
+.idea/
+.venv/
+
+# Python cache
+__pycache__/
+
+# IDE cache
+.vscode/
+
+# Build output

@@ -1,13 +1,13 @@
 """
 Transpiler for the Runa programming language.
-Converts Runa code to target languages (currently only Python).
+Converts Runa code to target languages (currently Python and JavaScript).
 """
 
-from lexer import RunaLexer
-from parser import RunaParser
-from analyzer import SemanticAnalyzer
-from generator import PyCodeGenerator
-from advanced import transpile_advanced
+from src.runa.lexer import RunaLexer
+from src.runa.parser import RunaParser
+from src.runa.analyzer import SemanticAnalyzer
+from src.runa.targets import get_generator, list_targets, SUPPORTED_TARGETS
+from src.runa.advanced import transpile_advanced
 
 
 class Transpiler:
@@ -18,22 +18,22 @@ class Transpiler:
         Initialize the transpiler with a target language and advanced features flag.
 
         Args:
-            target: The target language to transpile to (currently only "python" is supported)
+            target: The target language to transpile to (e.g., 'python', 'javascript')
             advanced: Whether to enable advanced language features
         """
-        self.target = target
+        self.target = target.lower()
         self.advanced = advanced
+
+        # Verify that the target language is supported
+        if self.target not in SUPPORTED_TARGETS:
+            supported = ", ".join(list_targets())
+            raise ValueError(f"Unsupported target language: {self.target}. Supported languages: {supported}")
 
         if not advanced:
             # Standard transpiler components
             self.parser = RunaParser()
             self.analyzer = SemanticAnalyzer()
-
-            # Select the appropriate code generator based on target language
-            if target == "python":
-                self.generator = PyCodeGenerator()
-            else:
-                raise ValueError(f"Unsupported target language: {target}")
+            self.generator = get_generator(self.target)
 
     def transpile(self, source, analyze=True):
         """
@@ -51,30 +51,63 @@ class Transpiler:
             - warnings is a list of warning messages
         """
         if self.advanced:
-            # Use the advanced transpiler
-            return transpile_advanced(source)
+            # Use the advanced transpiler with Python first
+            code, valid, errors, warnings = transpile_advanced(source)
 
-        # Standard transpilation process
-        # Parse the source code
-        ast = self.parser.parse(source)
+            # If targeting Python, return the result
+            if self.target == "python":
+                return code, valid, errors, warnings
 
-        if not ast:
-            return None, False, ["Failed to parse the source code"], []
-
-        # Perform semantic analysis if requested
-        if analyze:
-            valid = self.analyzer.analyze(ast)
-            errors = self.analyzer.errors
-            warnings = self.analyzer.warnings
-
+            # Otherwise, parse the AST and generate for the target language
             if not valid:
                 return None, False, errors, warnings
+
+            # Re-parse the source to get the AST
+            ast = self.parser.parse(source)
+
+            # Generate code for the target language
+            try:
+                target_code = self.generator.generate(ast)
+                return target_code, True, errors, warnings
+            except Exception as e:
+                errors.append(f"Error generating {self.target.capitalize()} code: {str(e)}")
+                return None, False, errors, warnings
+
         else:
-            valid = True
-            errors = []
-            warnings = []
+            # Standard transpilation process
+            # Parse the source code
+            ast = self.parser.parse(source)
 
-        # Generate code for the target language
-        code = self.generator.generate(ast)
+            if not ast:
+                return None, False, ["Failed to parse the source code"], []
 
-        return code, valid, errors, warnings
+            # Perform semantic analysis if requested
+            if analyze:
+                valid = self.analyzer.analyze(ast)
+                errors = self.analyzer.errors
+                warnings = self.analyzer.warnings
+
+                if not valid:
+                    return None, False, errors, warnings
+            else:
+                valid = True
+                errors = []
+                warnings = []
+
+            # Generate code for the target language
+            try:
+                code = self.generator.generate(ast)
+                return code, valid, errors, warnings
+            except Exception as e:
+                errors.append(f"Error generating {self.target.capitalize()} code: {str(e)}")
+                return None, False, errors, warnings
+
+    @staticmethod
+    def supported_targets():
+        """
+        Get a list of supported target languages.
+
+        Returns:
+            A list of supported target language names
+        """
+        return list_targets()

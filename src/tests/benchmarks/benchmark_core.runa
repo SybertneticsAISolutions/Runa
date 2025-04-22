@@ -1,0 +1,325 @@
+# Runa Benchmarking Core Module
+# This file implements the central benchmarking infrastructure for Runa
+
+import runa.time
+import runa.system
+import runa.io
+import runa.stats
+
+# Benchmark Configuration Object
+Process called "create_benchmark_config" that takes name, iterations, warmup_iterations:
+    Let config = {
+        "name": name,
+        "iterations": iterations || 10,
+        "warmup_iterations": warmup_iterations || 3,
+        "baseline_comparison": null,
+        "output_format": "console",
+        "output_file": null,
+        "display_percentiles": true,
+        "measure_memory": true,
+        "system_info": true,
+        "extended_metrics": false
+    }
+    
+    Return config
+
+# Benchmark Runner
+Process called "run_benchmark" that takes benchmark_function, config:
+    # Warmup phase
+    Print("Warming up " + config.name + "...")
+    For i in range(0, config.warmup_iterations):
+        benchmark_function()
+    
+    # Collection phase
+    Print("Running benchmark: " + config.name)
+    Let results = []
+    
+    # Memory baseline if requested
+    Let memory_before = null
+    If config.measure_memory:
+        memory_before = runa.system.get_memory_usage()
+    
+    # Execute iterations and measure
+    For i in range(0, config.iterations):
+        Let start_time = runa.time.now()
+        
+        # Execute the benchmark
+        Let result = benchmark_function()
+        
+        Let end_time = runa.time.now()
+        Let duration = runa.time.difference_ms(start_time, end_time)
+        
+        # Store result
+        results.push({
+            "iteration": i,
+            "duration_ms": duration,
+            "timestamp": end_time,
+            "result": result
+        })
+        
+        # Progress report
+        If config.iterations > 10 && i % 5 == 0:
+            Print("  Completed " + (i+1) + "/" + config.iterations + " iterations")
+    
+    # Memory measurement if requested
+    Let memory_after = null
+    Let memory_delta = null
+    If config.measure_memory:
+        memory_after = runa.system.get_memory_usage()
+        memory_delta = memory_after - memory_before
+    
+    # Process results
+    Let stats = process_benchmark_results(results, config)
+    
+    # Add memory metrics if available
+    If config.measure_memory:
+        stats.memory_before = memory_before
+        stats.memory_after = memory_after
+        stats.memory_delta = memory_delta
+    
+    # Add system info if requested
+    If config.system_info:
+        stats.system = runa.system.get_system_info()
+    
+    # Display results
+    If config.output_format == "console":
+        display_benchmark_results(stats, config)
+    
+    # Write to file if requested
+    If config.output_file:
+        save_benchmark_results(stats, config)
+    
+    Return stats
+
+# Process benchmark results to calculate statistics
+Process called "process_benchmark_results" that takes results, config:
+    Let durations = results.map(r => r.duration_ms)
+    
+    Let stats = {
+        "name": config.name,
+        "iterations": results.length,
+        "mean": runa.stats.mean(durations),
+        "median": runa.stats.median(durations),
+        "min": runa.stats.min(durations),
+        "max": runa.stats.max(durations),
+        "stdev": runa.stats.standard_deviation(durations),
+        "results": results
+    }
+    
+    # Calculate percentiles if requested
+    If config.display_percentiles:
+        stats.percentiles = {
+            "p25": runa.stats.percentile(durations, 25),
+            "p75": runa.stats.percentile(durations, 75),
+            "p90": runa.stats.percentile(durations, 90),
+            "p95": runa.stats.percentile(durations, 95),
+            "p99": runa.stats.percentile(durations, 99)
+        }
+    
+    # Calculate extended metrics if requested
+    If config.extended_metrics:
+        stats.extended = {
+            "coefficient_of_variation": stats.stdev / stats.mean,
+            "interquartile_range": stats.percentiles.p75 - stats.percentiles.p25,
+            "range": stats.max - stats.min
+        }
+    
+    # Compare with baseline if available
+    If config.baseline_comparison:
+        stats.comparison = {
+            "baseline_mean": config.baseline_comparison.mean,
+            "mean_difference": stats.mean - config.baseline_comparison.mean,
+            "mean_percent": (stats.mean / config.baseline_comparison.mean) * 100,
+            "improvement": config.baseline_comparison.mean > stats.mean
+        }
+    
+    Return stats
+
+# Display benchmark results in console
+Process called "display_benchmark_results" that takes stats, config:
+    Print("\n========================================")
+    Print("Benchmark Results: " + stats.name)
+    Print("========================================")
+    Print("Iterations:       " + stats.iterations)
+    Print("Mean time:        " + stats.mean.toFixed(2) + " ms")
+    Print("Median time:      " + stats.median.toFixed(2) + " ms")
+    Print("Min time:         " + stats.min.toFixed(2) + " ms")
+    Print("Max time:         " + stats.max.toFixed(2) + " ms")
+    Print("Standard dev:     " + stats.stdev.toFixed(2) + " ms")
+    
+    If config.display_percentiles:
+        Print("\nPercentiles:")
+        Print("  25th:          " + stats.percentiles.p25.toFixed(2) + " ms")
+        Print("  75th:          " + stats.percentiles.p75.toFixed(2) + " ms")
+        Print("  90th:          " + stats.percentiles.p90.toFixed(2) + " ms")
+        Print("  95th:          " + stats.percentiles.p95.toFixed(2) + " ms")
+        Print("  99th:          " + stats.percentiles.p99.toFixed(2) + " ms")
+    
+    If config.extended_metrics:
+        Print("\nExtended Metrics:")
+        Print("  CV:            " + stats.extended.coefficient_of_variation.toFixed(4))
+        Print("  IQR:           " + stats.extended.interquartile_range.toFixed(2) + " ms")
+        Print("  Range:         " + stats.extended.range.toFixed(2) + " ms")
+    
+    If config.measure_memory:
+        Print("\nMemory Usage:")
+        Print("  Before:        " + stats.memory_before.toFixed(2) + " MB")
+        Print("  After:         " + stats.memory_after.toFixed(2) + " MB")
+        Print("  Delta:         " + stats.memory_delta.toFixed(2) + " MB")
+    
+    If stats.comparison:
+        Print("\nComparison to Baseline:")
+        Print("  Baseline mean: " + stats.comparison.baseline_mean.toFixed(2) + " ms")
+        Print("  Difference:    " + stats.comparison.mean_difference.toFixed(2) + " ms")
+        Print("  Percentage:    " + stats.comparison.mean_percent.toFixed(2) + "%")
+        
+        If stats.comparison.improvement:
+            Print("  Improvement:   " + 
+                  ((1 - (stats.mean / stats.comparison.baseline_mean)) * 100).toFixed(2) + "%")
+        Else:
+            Print("  Slowdown:      " + 
+                  ((stats.mean / stats.comparison.baseline_mean - 1) * 100).toFixed(2) + "%")
+    
+    If config.system_info:
+        Print("\nSystem Information:")
+        Print("  OS:            " + stats.system.os)
+        Print("  CPU:           " + stats.system.cpu)
+        Print("  Cores:         " + stats.system.cores)
+        Print("  Memory:        " + stats.system.total_memory + " GB")
+        Print("  Runa Version:  " + stats.system.runa_version)
+    
+    Print("========================================\n")
+
+# Save benchmark results to file
+Process called "save_benchmark_results" that takes stats, config:
+    Let output_format = config.output_file.split('.').pop().toLowerCase()
+    Let content = null
+    
+    If output_format == "json":
+        content = JSON.stringify(stats, null, 2)
+    Else If output_format == "csv":
+        # Create CSV content
+        Let header = "iteration,duration_ms,timestamp\n"
+        Let rows = stats.results.map(r => 
+            r.iteration + "," + r.duration_ms + "," + r.timestamp
+        ).join("\n")
+        content = header + rows
+    Else:
+        # Default to plain text
+        content = "Benchmark: " + stats.name + "\n"
+        content += "Iterations: " + stats.iterations + "\n"
+        content += "Mean: " + stats.mean + " ms\n"
+        content += "Median: " + stats.median + " ms\n"
+        content += "Min: " + stats.min + " ms\n"
+        content += "Max: " + stats.max + " ms\n"
+        content += "StdDev: " + stats.stdev + " ms\n"
+    
+    # Write to file
+    runa.io.write_file(config.output_file, content)
+    Print("Results saved to " + config.output_file)
+
+# Create a benchmark suite to run multiple benchmarks
+Process called "create_benchmark_suite" that takes name:
+    Let suite = {
+        "name": name,
+        "benchmarks": [],
+        "global_config": create_benchmark_config("Global", 10, 3)
+    }
+    
+    # Add a benchmark to the suite
+    suite.add = function(name, function, config_override) {
+        Let benchmark_config = {
+            ...this.global_config,
+            "name": name
+        }
+        
+        # Apply any config overrides
+        If config_override:
+            For key in config_override:
+                benchmark_config[key] = config_override[key]
+        
+        this.benchmarks.push({
+            "name": name,
+            "function": function,
+            "config": benchmark_config
+        })
+        
+        Return this
+    }
+    
+    # Set global configuration options
+    suite.configure = function(config_options) {
+        For key in config_options:
+            this.global_config[key] = config_options[key]
+            
+        Return this
+    }
+    
+    # Run all benchmarks in the suite
+    suite.run = function() {
+        Print("\n====== BENCHMARK SUITE: " + this.name + " ======\n")
+        
+        Let suite_results = {
+            "name": this.name,
+            "timestamp": runa.time.now(),
+            "benchmarks": []
+        }
+        
+        For benchmark in this.benchmarks:
+            Let results = run_benchmark(benchmark.function, benchmark.config)
+            suite_results.benchmarks.push(results)
+        
+        Print("\n====== BENCHMARK SUITE COMPLETED ======\n")
+        
+        Return suite_results
+    }
+    
+    Return suite
+
+# Compare two benchmark results
+Process called "compare_benchmarks" that takes benchmark_a, benchmark_b:
+    Let comparison = {
+        "name_a": benchmark_a.name,
+        "name_b": benchmark_b.name,
+        "mean_a": benchmark_a.mean,
+        "mean_b": benchmark_b.mean,
+        "median_a": benchmark_a.median,
+        "median_b": benchmark_b.median,
+        "difference_ms": benchmark_b.mean - benchmark_a.mean,
+        "percentage": (benchmark_b.mean / benchmark_a.mean) * 100,
+        "improvement": benchmark_a.mean > benchmark_b.mean
+    }
+    
+    # Calculate improvement or slowdown
+    If comparison.improvement:
+        comparison.improvement_percent = ((1 - (benchmark_b.mean / benchmark_a.mean)) * 100)
+    Else:
+        comparison.slowdown_percent = ((benchmark_b.mean / benchmark_a.mean - 1) * 100)
+    
+    # Display comparison
+    Print("\n======== BENCHMARK COMPARISON ========")
+    Print(comparison.name_a + " vs. " + comparison.name_b)
+    Print("Mean time A:      " + comparison.mean_a.toFixed(2) + " ms")
+    Print("Mean time B:      " + comparison.mean_b.toFixed(2) + " ms")
+    Print("Difference:       " + comparison.difference_ms.toFixed(2) + " ms")
+    Print("Relative:         " + comparison.percentage.toFixed(2) + "%")
+    
+    If comparison.improvement:
+        Print("Improvement:      " + comparison.improvement_percent.toFixed(2) + "%")
+    Else:
+        Print("Slowdown:         " + comparison.slowdown_percent.toFixed(2) + "%")
+    
+    Print("=======================================\n")
+    
+    Return comparison
+
+# Export public interface
+export {
+    create_benchmark_config,
+    run_benchmark,
+    process_benchmark_results,
+    display_benchmark_results,
+    save_benchmark_results,
+    create_benchmark_suite,
+    compare_benchmarks
+} 

@@ -1,0 +1,148 @@
+# Basic Runa Unit Testing Example
+import runa.test.unit_test_framework as test
+
+# Create a simple math test suite
+Process called CreateMathTestSuite()
+    # Initialize the test suite
+    Let mathSuite = test.create_test_suite("Math Operations", "Tests for basic math operations")
+    
+    # Setup function that runs before all tests
+    mathSuite.before_all = function() {
+        Print("Setting up Math test suite")
+    }
+    
+    # Teardown function that runs after all tests
+    mathSuite.after_all = function() {
+        Print("Cleaning up Math test suite")
+    }
+    
+    # Add a test for addition
+    mathSuite.add_test("Addition Test", function() {
+        Let result = 2 + 3
+        test.assert_equal(result, 5, "2 + 3 should equal 5")
+    }, ["basic", "arithmetic"])
+    
+    # Add a test for subtraction
+    mathSuite.add_test("Subtraction Test", function() {
+        Let result = 10 - 4
+        test.assert_equal(result, 6, "10 - 4 should equal 6")
+    }, ["basic", "arithmetic"])
+    
+    # Add a test for multiplication
+    mathSuite.add_test("Multiplication Test", function() {
+        Let result = 3 * 5
+        test.assert_equal(result, 15, "3 * 5 should equal 15")
+    }, ["basic", "arithmetic"])
+    
+    # Add a test for division
+    mathSuite.add_test("Division Test", function() {
+        Let result = 20 / 4
+        test.assert_equal(result, 5, "20 / 4 should equal 5")
+    }, ["basic", "arithmetic"])
+    
+    # Configure the test suite
+    mathSuite.configure({
+        "report_format": "text",
+        "verbose": true,
+        "fail_fast": false
+    })
+    
+    Return mathSuite
+End Process
+
+# Create a string manipulation test suite
+Process called CreateStringTestSuite()
+    # Initialize the test suite
+    Let stringSuite = test.create_test_suite("String Operations", "Tests for string manipulation")
+    
+    # Setup function that runs before each test
+    stringSuite.before_each = function() {
+        # Initialize test data for each test
+        Let testStr = "Hello World"
+    }
+    
+    # Add a test for string concatenation
+    stringSuite.add_test("String Concatenation", function() {
+        Let str1 = "Hello"
+        Let str2 = "World"
+        Let result = str1 + " " + str2
+        test.assert_equal(result, "Hello World", "String concatenation failed")
+    }, ["string"])
+    
+    # Add a test for substring
+    stringSuite.add_test("Substring Test", function() {
+        Let str = "Hello World"
+        Let result = str.substring(0, 5)
+        test.assert_equal(result, "Hello", "Substring extraction failed")
+    }, ["string"])
+    
+    # Add a test for string length
+    stringSuite.add_test("String Length", function() {
+        Let str = "Hello World"
+        Let length = str.length
+        test.assert_equal(length, 11, "String length calculation failed")
+    }, ["string"])
+    
+    # Add a test with expected failure to demonstrate error handling
+    stringSuite.add_test("Intentional Failure Test", function() {
+        Let str = "Hello World"
+        # This should fail as the uppercase is "HELLO WORLD"
+        test.assert_equal(str.toUpperCase(), "Hello World", "This test should fail")
+    }, ["string", "failure"])
+    
+    # Configure the test suite
+    stringSuite.configure({
+        "report_format": "json",
+        "report_file": "./string_test_results.json",
+        "verbose": true
+    })
+    
+    Return stringSuite
+End Process
+
+# Main test runner
+Process called RunBasicTests()
+    # Create test suites
+    Let mathSuite = CreateMathTestSuite()
+    Let stringSuite = CreateStringTestSuite()
+    
+    # Run the tests
+    Print("Running Math Test Suite:")
+    Let mathResults = mathSuite.run()
+    
+    Print("\nRunning String Test Suite:")
+    Let stringResults = stringSuite.run()
+    
+    # Display final results
+    Print("\nTest Execution Summary:")
+    Print("=====================")
+    Print("Math Tests:")
+    Print("  Passed: " + mathResults.passed)
+    Print("  Failed: " + mathResults.failed)
+    Print("  Errors: " + mathResults.errors)
+    
+    Print("\nString Tests:")
+    Print("  Passed: " + stringResults.passed)
+    Print("  Failed: " + stringResults.failed)
+    Print("  Errors: " + stringResults.errors)
+    
+    Let totalPassed = mathResults.passed + stringResults.passed
+    Let totalFailed = mathResults.failed + stringResults.failed
+    Let totalErrors = mathResults.errors + stringResults.errors
+    
+    Print("\nOverall Results:")
+    Print("  Total Passed: " + totalPassed)
+    Print("  Total Failed: " + totalFailed)
+    Print("  Total Errors: " + totalErrors)
+    
+    Return {
+        "mathResults": mathResults,
+        "stringResults": stringResults,
+        "totalPassed": totalPassed,
+        "totalFailed": totalFailed,
+        "totalErrors": totalErrors
+    }
+End Process
+
+# Run the tests
+RunBasicTests() 

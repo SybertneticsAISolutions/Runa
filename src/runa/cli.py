@@ -1,11 +1,12 @@
 import click
 import os
 import sys
-from lexer import RunaLexer
-from parser import RunaParser
-from analyzer import SemanticAnalyzer
-from generator import PyCodeGenerator
-from advanced import transpile_advanced
+from src.runa.lexer import RunaLexer
+from src.runa.parser import RunaParser
+from src.runa.analyzer import SemanticAnalyzer
+from src.runa.generator import PyCodeGenerator
+from src.runa.advanced import transpile_advanced
+from src.runa.transpiler import Transpiler
 
 
 @click.group()
@@ -17,86 +18,65 @@ def main():
 
 @main.command()
 @click.argument('file', type=click.Path(exists=True))
-@click.option('--output', '-o', help='Output file for the generated Python code.')
+@click.option('--output', '-o', help='Output file for the generated code.')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose output.')
 @click.option('--advanced', '-a', is_flag=True, help='Enable advanced language features.')
-def compile(file, output, verbose, advanced):
-    """Compile a Runa file to Python code."""
+@click.option('--target', '-t', default='python', help='Target language (python, javascript).')
+def compile(file, output, verbose, advanced, target):
+    """Compile a Runa file to the target language code."""
     # Read the input file
     with open(file, 'r') as f:
         source = f.read()
 
-    if advanced:
-        # Use advanced transpiler
-        if verbose:
-            click.echo(f"Parsing {file} with advanced language features...")
+    # Check if the target language is supported
+    try:
+        transpiler = Transpiler(target=target, advanced=advanced)
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        return 1
 
-        code, valid, errors, warnings = transpile_advanced(source)
+    if verbose:
+        click.echo(
+            f"Parsing {file}" + (" with advanced language features" if advanced else "") + f" targeting {target}...")
 
-        # Print any errors or warnings
-        for warning in warnings:
-            click.echo(f"Warning: {warning}", err=True)
+    # Transpile the source code
+    code, valid, errors, warnings = transpiler.transpile(source)
 
-        for error in errors:
-            click.echo(f"Error: {error}", err=True)
+    # Print any errors or warnings
+    for warning in warnings:
+        click.echo(f"Warning: {warning}", err=True)
 
-        if not valid:
-            click.echo("Compilation failed due to errors.", err=True)
-            return 1
+    for error in errors:
+        click.echo(f"Error: {error}", err=True)
 
-        if verbose:
-            click.echo("Generated Python code.")
-    else:
-        # Use basic transpiler
-        parser = RunaParser()
+    if not valid:
+        click.echo("Compilation failed due to errors.", err=True)
+        return 1
 
-        if verbose:
-            click.echo(f"Parsing {file}...")
+    if verbose:
+        click.echo(f"Generated {target} code.")
 
-        ast = parser.parse(source)
-
-        if not ast:
-            click.echo(f"Failed to parse {file}", err=True)
-            return 1
-
-        # Perform semantic analysis
-        if verbose:
-            click.echo("Performing semantic analysis...")
-
-        analyzer = SemanticAnalyzer()
-        valid = analyzer.analyze(ast)
-
-        # Print any errors or warnings
-        for warning in analyzer.warnings:
-            click.echo(f"Warning: {warning}", err=True)
-
-        for error in analyzer.errors:
-            click.echo(f"Error: {error}", err=True)
-
-        if not valid:
-            click.echo("Compilation failed due to semantic errors.", err=True)
-            return 1
-
-        # Generate Python code
-        if verbose:
-            click.echo("Generating Python code...")
-
-        generator = PyCodeGenerator()
-        code = generator.generate(ast)
+    # Determine the file extension for the target language
+    ext_map = {
+        'python': '.py',
+        'javascript': '.js',
+        'js': '.js'
+    }
+    file_ext = ext_map.get(target.lower(), '.txt')
 
     # Write the output
     if output:
         with open(output, 'w') as f:
             f.write(code)
         if verbose:
-            click.echo(f"Generated Python code written to {output}")
+            click.echo(f"Generated {target} code written to {output}")
     else:
-        # Use the same name as the input file but with .py extension
-        output_file = os.path.splitext(file)[0] + '.py'
+        # Use the same name as the input file but with the appropriate extension
+        output_file = os.path.splitext(file)[0] + file_ext
         with open(output_file, 'w') as f:
             f.write(code)
         if verbose:
-            click.echo(f"Generated Python code written to {output_file}")
+            click.echo(f"Generated {target} code written to {output_file}")
 
     return 0
 
@@ -105,11 +85,17 @@ def compile(file, output, verbose, advanced):
 @click.argument('file', type=click.Path(exists=True))
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose output.')
 @click.option('--advanced', '-a', is_flag=True, help='Enable advanced language features.')
-def run(file, verbose, advanced):
+@click.option('--target', '-t', default='python', help='Target language (python, javascript).')
+def run(file, verbose, advanced, target):
     """Run a Runa file directly."""
+    # Currently, we can only run Python targets
+    if target.lower() not in ('python', 'py'):
+        click.echo(f"Error: Can only run Python targets. Use 'compile' for {target}.", err=True)
+        return 1
+
     # Compile the file to Python
     output_file = os.path.splitext(file)[0] + '.py'
-    result = compile.callback(file, output_file, verbose, advanced)
+    result = compile.callback(file, output_file, verbose, advanced, target)
 
     if result != 0:
         return result
@@ -131,15 +117,29 @@ def run(file, verbose, advanced):
 
 @main.command()
 @click.option('--advanced', '-a', is_flag=True, help='Enable advanced language features.')
-def repl(advanced):
+@click.option('--target', '-t', default='python', help='Target language (python, javascript).')
+def repl(advanced, target):
     """Start an interactive Runa REPL."""
+    # Currently, we can only run Python targets in REPL
+    if target.lower() not in ('python', 'py'):
+        click.echo(f"Error: REPL only supports Python targets. Use 'compile' for {target}.", err=True)
+        return 1
+
     click.echo("Runa REPL (Version 0.1.0)")
     if advanced:
         click.echo("Advanced language features enabled: pattern matching, async, functional, types")
+    click.echo(f"Target language: {target}")
     click.echo("Type 'exit' to quit.")
 
+    # Create appropriate parser and generator based on options
+    try:
+        transpiler = Transpiler(target=target, advanced=advanced)
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        return 1
+
     if advanced:
-        from advanced import parse_advanced, analyze_advanced, generate_advanced
+        from src.runa.advanced import parse_advanced, analyze_advanced, generate_advanced
         parser_func = parse_advanced
         analyzer_func = lambda ast: (analyze_advanced(ast), [])  # Returns (valid, errors)
         generator_func = generate_advanced
@@ -194,6 +194,16 @@ def repl(advanced):
             click.echo(f"Error: {str(e)}")
 
     click.echo("Goodbye!")
+    return 0
+
+
+@main.command()
+def targets():
+    """List supported target languages."""
+    target_list = Transpiler.supported_targets()
+    click.echo("Supported target languages:")
+    for target in target_list:
+        click.echo(f"  - {target}")
     return 0
 
 

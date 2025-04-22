@@ -1,0 +1,279 @@
+# Runa Compiler Benchmarks
+# This file contains benchmarks for measuring Runa compiler performance
+
+import runa.compiler
+import runa.io
+import runa.path
+import runa.system
+import "./benchmark_core.runa" as benchmark
+
+# Benchmark for basic compilation time
+Process called "benchmark_basic_compilation":
+    Let code = 'Process called "hello" that takes name:\n    Print("Hello, " + name + "!")\n\nhello("World")'
+    
+    Let bench_fn = function() {
+        Let compiler_result = runa.compiler.compile_string(code, {
+            "optimize": false,
+            "source_maps": false,
+            "emit_ast": false
+        })
+        Return compiler_result
+    }
+    
+    Let config = benchmark.create_benchmark_config("Basic Compilation", 50, 5)
+    Let results = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Benchmark for optimized compilation
+Process called "benchmark_optimized_compilation":
+    Let code = 'Process called "hello" that takes name:\n    Print("Hello, " + name + "!")\n\nhello("World")'
+    
+    Let bench_fn = function() {
+        Let compiler_result = runa.compiler.compile_string(code, {
+            "optimize": true,
+            "optimization_level": "aggressive",
+            "source_maps": false,
+            "emit_ast": false
+        })
+        Return compiler_result
+    }
+    
+    Let config = benchmark.create_benchmark_config("Optimized Compilation", 50, 5)
+    Let results = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Benchmark for compiling with different code sizes
+Process called "benchmark_compilation_scaling":
+    # Generate code of different sizes
+    Let generate_code = function(iterations) {
+        Let code = ""
+        For i in range(0, iterations):
+            code += 'Process called "func_' + i + '" that takes x:\n'
+            code += '    Let result = x * ' + i + '\n'
+            code += '    Return result\n\n'
+        
+        code += 'Let result = 0\n'
+        For i in range(0, iterations):
+            code += 'result += func_' + i + '(' + i + ')\n'
+        
+        code += 'Print("Result: " + result)\n'
+        Return code
+    }
+    
+    Let sizes = [10, 50, 100, 200, 500]
+    Let results = {}
+    
+    For size in sizes:
+        Print("\nBenchmarking compilation of " + size + " functions...")
+        Let code = generate_code(size)
+        
+        Let bench_fn = function() {
+            Let compiler_result = runa.compiler.compile_string(code, {
+                "optimize": true,
+                "source_maps": false
+            })
+            Return compiler_result
+        }
+        
+        Let config = benchmark.create_benchmark_config("Compilation " + size + " functions", 10, 2)
+        results[size] = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Benchmark for parsing speed
+Process called "benchmark_parsing":
+    Let code = runa.io.read_file(runa.path.join(
+        runa.system.get_module_path(), 
+        "../examples/showcase.runa"
+    ))
+    
+    Let bench_fn = function() {
+        Let ast = runa.compiler.parse(code, {
+            "filename": "showcase.runa"
+        })
+        Return ast
+    }
+    
+    Let config = benchmark.create_benchmark_config("Parsing", 100, 10)
+    Let results = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Benchmark AST generation
+Process called "benchmark_ast_generation":
+    Let code = runa.io.read_file(runa.path.join(
+        runa.system.get_module_path(), 
+        "../examples/showcase.runa"
+    ))
+    
+    Let bench_fn = function() {
+        Let ast = runa.compiler.parse(code, {
+            "filename": "showcase.runa",
+            "emit_ast": true
+        })
+        Return ast
+    }
+    
+    Let config = benchmark.create_benchmark_config("AST Generation", 50, 5)
+    Let results = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Benchmark type checking
+Process called "benchmark_type_checking":
+    Let code = runa.io.read_file(runa.path.join(
+        runa.system.get_module_path(), 
+        "../examples/types.runa"
+    ))
+    
+    Let bench_fn = function() {
+        Let result = runa.compiler.type_check(code, {
+            "filename": "types.runa",
+            "strict": true
+        })
+        Return result
+    }
+    
+    Let config = benchmark.create_benchmark_config("Type Checking", 50, 5)
+    Let results = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Benchmark code generation
+Process called "benchmark_code_generation":
+    Let code = runa.io.read_file(runa.path.join(
+        runa.system.get_module_path(), 
+        "../examples/showcase.runa"
+    ))
+    
+    # First parse to get AST
+    Let ast = runa.compiler.parse(code, {
+        "filename": "showcase.runa"
+    })
+    
+    Let bench_fn = function() {
+        Let result = runa.compiler.generate_code(ast, {
+            "optimize": false,
+            "source_maps": false
+        })
+        Return result
+    }
+    
+    Let config = benchmark.create_benchmark_config("Code Generation", 50, 5)
+    Let results = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Benchmark optimized code generation
+Process called "benchmark_optimized_code_generation":
+    Let code = runa.io.read_file(runa.path.join(
+        runa.system.get_module_path(), 
+        "../examples/showcase.runa"
+    ))
+    
+    # First parse to get AST
+    Let ast = runa.compiler.parse(code, {
+        "filename": "showcase.runa"
+    })
+    
+    Let bench_fn = function() {
+        Let result = runa.compiler.generate_code(ast, {
+            "optimize": true,
+            "optimization_level": "aggressive",
+            "source_maps": false
+        })
+        Return result
+    }
+    
+    Let config = benchmark.create_benchmark_config("Optimized Code Generation", 50, 5)
+    Let results = benchmark.run_benchmark(bench_fn, config)
+    
+    Return results
+
+# Run a full compilation benchmark suite
+Process called "run_compiler_benchmark_suite":
+    Let suite = benchmark.create_benchmark_suite("Runa Compiler Performance")
+    
+    # Configure global settings
+    suite.configure({
+        "iterations": 30,
+        "warmup_iterations": 5,
+        "output_format": "console",
+        "display_percentiles": true,
+        "measure_memory": true,
+        "extended_metrics": true
+    })
+    
+    # Add benchmarks
+    suite.add("Basic Compilation", function() {
+        Let code = 'Process called "hello" that takes name:\n    Print("Hello, " + name + "!")\n\nhello("World")'
+        Let result = runa.compiler.compile_string(code, { "optimize": false })
+        Return result
+    })
+    
+    suite.add("Optimized Compilation", function() {
+        Let code = 'Process called "hello" that takes name:\n    Print("Hello, " + name + "!")\n\nhello("World")'
+        Let result = runa.compiler.compile_string(code, { "optimize": true, "optimization_level": "aggressive" })
+        Return result
+    })
+    
+    suite.add("Parsing Only", function() {
+        Let code = runa.io.read_file(runa.path.join(
+            runa.system.get_module_path(), 
+            "../examples/showcase.runa"
+        ))
+        Let ast = runa.compiler.parse(code, { "filename": "showcase.runa" })
+        Return ast
+    })
+    
+    suite.add("Type Checking", function() {
+        Let code = runa.io.read_file(runa.path.join(
+            runa.system.get_module_path(), 
+            "../examples/types.runa"
+        ))
+        Let result = runa.compiler.type_check(code, { "filename": "types.runa", "strict": true })
+        Return result
+    })
+    
+    # Add benchmark for a complex file compilation
+    suite.add("Complex File Compilation", function() {
+        Let code = runa.io.read_file(runa.path.join(
+            runa.system.get_module_path(), 
+            "../examples/showcase.runa"
+        ))
+        Let result = runa.compiler.compile_string(code, { 
+            "optimize": true,
+            "source_maps": true
+        })
+        Return result
+    })
+    
+    # Run the suite
+    Let results = suite.run()
+    
+    # Save results if desired
+    # runa.io.write_file("compiler_benchmark_results.json", JSON.stringify(results, null, 2))
+    
+    Return results
+
+# Run all benchmarks
+Process called "run_all_benchmarks":
+    Print("Running Runa compiler benchmarks...")
+    
+    # Run the whole suite
+    Let suite_results = run_compiler_benchmark_suite()
+    
+    # Optionally run specific benchmarks
+    # Let basic_results = benchmark_basic_compilation()
+    # Let optimized_results = benchmark_optimized_compilation()
+    # Let scaling_results = benchmark_compilation_scaling()
+    
+    Print("All compiler benchmarks completed.")
+    
+    Return suite_results
+
+# If this file is being run directly, execute the benchmarks
+If runa.system.is_main_module():
+    run_all_benchmarks() 
