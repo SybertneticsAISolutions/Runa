@@ -4,10 +4,11 @@ Runa is a revolutionary programming language designed to bridge human thought pa
 
 ## Project Status
 
-This is Phase 2 of the Runa language implementation, focusing on the parser and transpiler components. The language is currently in active development and not ready for production use.
+Runa is currently in active development. The language implementation includes both core features and advanced programming paradigms.
 
 ## Features
 
+### Core Features
 - Natural language-like syntax
 - Python-like indentation for block structure
 - Transpilation to Python (with more target languages planned)
@@ -16,6 +17,12 @@ This is Phase 2 of the Runa language implementation, focusing on the parser and 
 - Control structures (if-else, for-each)
 - Lists and dictionaries
 - Basic type system with inference
+
+### Advanced Features
+- **Pattern Matching**: Sophisticated pattern matching with destructuring for data extraction and case analysis
+- **Asynchronous Programming**: Native async/await syntax for non-blocking operations
+- **Functional Programming**: First-class functions, pipelines, and higher-order operations
+- **Enhanced Type System**: Rich type annotations, inference, and checking
 
 ## Installation
 
@@ -55,6 +62,11 @@ runa run hello_world.runa
 
 # Start the REPL
 runa repl
+
+# Enable advanced language features
+runa compile --advanced hello_world.runa
+runa run --advanced hello_world.runa
+runa repl --advanced
 ```
 
 ## Language Guide
@@ -66,6 +78,9 @@ Let variable_name be value
 
 # Variable assignment
 Set variable_name to new_value
+
+# Typed variable declaration
+Let variable_name (Type) be value
 ```
 
 ### Control Structures
@@ -81,10 +96,15 @@ For each item in collection:
     # Loop body
 ```
 
-### Functions(Processes)
+### Functions (Processes)
 ```
 # Function definition
 Process called "function_name" that takes parameter1 and parameter2:
+    # Function body
+    Return result
+
+# Typed function definition
+Process called "function_name" that takes parameter1 (Type1) and parameter2 (Type2) returns (ReturnType):
     # Function body
     Return result
 
@@ -106,6 +126,64 @@ Let person be dictionary with:
     "age" as 30
     "city" as "New York"
 ```
+
+### Advanced Features
+
+#### Pattern Matching
+```
+Match value:
+    When pattern1:
+        # Code for pattern1
+    When pattern2:
+        # Code for pattern2
+    When _:
+        # Default case
+```
+
+#### Asynchronous Programming
+```
+# Async function definition
+Async Process called "fetch_data" that takes url:
+    # Async operations
+    Let response be await http_client.get with url as url
+    Return response
+
+# Async for loop
+Async For each item in items:
+    # Async loop body
+```
+
+#### Functional Programming
+```
+# Lambda expression
+Let add be Lambda a and b: a plus b
+
+# Pipeline operator
+Let result be data |> process |> format
+
+# Higher-order functions
+Let doubled be Map numbers over double
+Let evens be Filter numbers using is_even
+Let sum be Reduce numbers using add
+```
+
+#### Type System
+```
+# Type aliases
+Type UserId is Integer
+Type User is Dictionary[String, Any]
+
+# Typed variable declarations
+Let user_id (UserId) be 12345
+
+# Generic types
+Type Pair[T, U] is Dictionary[String, Any]
+
+# Generic functions
+Process [T] called "first" that takes items (List[T]) returns (T):
+    Return items at index 0
+```
+
 ## Development
 
 ### Running Tests
@@ -117,15 +195,18 @@ pip install pytest
 pytest
 ```
 
-## Future Plans
-- Context-aware interpretation
-- Multiple target languages
-- IDE integration
-- AI-to-AI communication features
-- Enhanced type system
-- Pattern matching
-- Asynchronous programming
-- Functional programming extensions
+### Project Structure
+```
+runa/
+├── src/
+│   ├── runa/           # Core language components
+│   │   ├── async/      # Asynchronous programming support
+│   │   ├── functional/ # Functional programming features
+│   │   ├── patterns/   # Pattern matching system
+│   │   ├── types/      # Enhanced type system
+│   └── tests/          # Test suite
+├── docs/               # Documentation
+```
 
 ## License
 

@@ -7,22 +7,33 @@ from lexer import RunaLexer
 from parser import RunaParser
 from analyzer import SemanticAnalyzer
 from generator import PyCodeGenerator
+from advanced import transpile_advanced
 
 
 class Transpiler:
     """Main transpiler class for converting Runa code to target languages."""
 
-    def __init__(self, target="python"):
-        """Initialize the transpiler with a target language."""
-        self.target = target
-        self.parser = RunaParser()
-        self.analyzer = SemanticAnalyzer()
+    def __init__(self, target="python", advanced=False):
+        """
+        Initialize the transpiler with a target language and advanced features flag.
 
-        # Select the appropriate code generator based on target language
-        if target == "python":
-            self.generator = PyCodeGenerator()
-        else:
-            raise ValueError(f"Unsupported target language: {target}")
+        Args:
+            target: The target language to transpile to (currently only "python" is supported)
+            advanced: Whether to enable advanced language features
+        """
+        self.target = target
+        self.advanced = advanced
+
+        if not advanced:
+            # Standard transpiler components
+            self.parser = RunaParser()
+            self.analyzer = SemanticAnalyzer()
+
+            # Select the appropriate code generator based on target language
+            if target == "python":
+                self.generator = PyCodeGenerator()
+            else:
+                raise ValueError(f"Unsupported target language: {target}")
 
     def transpile(self, source, analyze=True):
         """
@@ -39,6 +50,11 @@ class Transpiler:
             - errors is a list of error messages
             - warnings is a list of warning messages
         """
+        if self.advanced:
+            # Use the advanced transpiler
+            return transpile_advanced(source)
+
+        # Standard transpilation process
         # Parse the source code
         ast = self.parser.parse(source)
 
